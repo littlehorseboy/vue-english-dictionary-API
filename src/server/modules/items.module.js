@@ -112,7 +112,7 @@ FROM english_dictionary.words w`, (error, result) => {
             console.log('SQL error: ', error);
             reject(error);
           } else {
-            let objs = result;
+            const objs = result;
             selectDerivations()
               .then((derivations) => {
                 objs.forEach((obj) => {
@@ -124,11 +124,10 @@ FROM english_dictionary.words w`, (error, result) => {
                     if (derivations.findIndex((item) => {
                       return item.wordId === obj.wordId;
                     }) !== -1) {
-                      obj.derivations = obj.derivations.concat(derivations.splice(derivations.findIndex((item) => {
-                        return item.wordId === obj.wordId;
-                      }), derivations.findIndex((item) => {
-                        return item.wordId === obj.wordId;
-                      }) + 1));
+                      obj.derivations =
+                        obj.derivations.concat(derivations.splice(derivations.findIndex((item) => {
+                          return item.wordId === obj.wordId;
+                        }), 1));
 
                       findConcat();
                     }
@@ -138,22 +137,78 @@ FROM english_dictionary.words w`, (error, result) => {
                 });
                 selectSynonyms()
                   .then((synonyms) => {
+                    objs.forEach((obj) => {
+                      if (!obj.synonyms) {
+                        obj.synonyms = [];
+                      }
+
+                      const findConcat = () => {
+                        if (synonyms.findIndex((item) => {
+                          return item.wordId === obj.wordId;
+                        }) !== -1) {
+                          obj.synonyms =
+                            obj.synonyms.concat(synonyms.splice(synonyms.findIndex((item) => {
+                              return item.wordId === obj.wordId;
+                            }), 1));
+
+                          findConcat();
+                        }
+                      };
+
+                      findConcat();
+                    });
 
                     selectAntonyms()
                       .then((antonyms) => {
+                        objs.forEach((obj) => {
+                          if (!obj.antonyms) {
+                            obj.antonyms = [];
+                          }
+
+                          const findConcat = () => {
+                            if (antonyms.findIndex((item) => {
+                              return item.wordId === obj.wordId;
+                            }) !== -1) {
+                              obj.antonyms =
+                                obj.antonyms.concat(antonyms.splice(antonyms.findIndex((item) => {
+                                  return item.wordId === obj.wordId;
+                                }), 1));
+
+                              findConcat();
+                            }
+                          };
+
+                          findConcat();
+                        });
 
                         selectSentences()
                           .then((sentences) => {
+                            objs.forEach((obj) => {
+                              if (!obj.sentences) {
+                                obj.sentences = [];
+                              }
+
+                              const findConcat = () => {
+                                if (sentences.findIndex((item) => {
+                                  return item.wordId === obj.wordId;
+                                }) !== -1) {
+                                  obj.sentences =
+                                    obj.sentences.concat(sentences.splice(sentences.findIndex((item) => {
+                                      return item.wordId === obj.wordId;
+                                    }), 1));
+
+                                  findConcat();
+                                }
+                              };
+
+                              findConcat();
+                            });
+
                             resolve(objs);
-
                           });
-
                       });
-
                   });
-
               });
-
           }
           connection.release();
         });
@@ -169,7 +224,8 @@ const createitems = (insertValues) => {
       if (connectionError) {
         reject(connectionError);
       } else {
-        connection.query('INSERT INTO timelineitems SET ?', insertValues, (error, result) => {
+        
+        connection.query('INSERT INTO english_dictionary.words SET ?', insertValues, (error, result) => {
           if (error) {
             console.log('SQL error: ', error);
             reject(error);
