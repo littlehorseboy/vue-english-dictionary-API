@@ -12,27 +12,148 @@ const connectionPool = mysql.createPool({
 });
 
 /** items GET 取得 */
+const selectDerivations = () => {
+  return new Promise((resolve, reject) => {
+    connectionPool.getConnection((connectionError, connection) => {
+      if (connectionError) {
+        reject(connectionError);
+      } else {
+        connection.query(`SELECT
+derivationId, derivation, partOfSpeech, derivationChinese, wordId
+FROM english_dictionary.derivations`, (error, result) => {
+          if (error) {
+            console.log('SQL error: ', error);
+            reject(error);
+          } else {
+            resolve(result);
+          }
+          connection.release();
+        });
+      }
+    });
+  });
+};
+
+const selectSynonyms = () => {
+  return new Promise((resolve, reject) => {
+    connectionPool.getConnection((connectionError, connection) => {
+      if (connectionError) {
+        reject(connectionError);
+      } else {
+        connection.query(`SELECT
+synonymId, synonym, partOfSpeech, synonymChinese, wordId
+FROM english_dictionary.synonyms`, (error, result) => {
+          if (error) {
+            console.log('SQL error: ', error);
+            reject(error);
+          } else {
+            resolve(result);
+          }
+          connection.release();
+        });
+      }
+    });
+  });
+};
+
+const selectAntonyms = () => {
+  return new Promise((resolve, reject) => {
+    connectionPool.getConnection((connectionError, connection) => {
+      if (connectionError) {
+        reject(connectionError);
+      } else {
+        connection.query(`SELECT
+antonymId, antonym, partOfSpeech, antonymChinese, wordId
+FROM english_dictionary.antonyms w`, (error, result) => {
+          if (error) {
+            console.log('SQL error: ', error);
+            reject(error);
+          } else {
+            resolve(result);
+          }
+          connection.release();
+        });
+      }
+    });
+  });
+};
+
+const selectSentences = () => {
+  return new Promise((resolve, reject) => {
+    connectionPool.getConnection((connectionError, connection) => {
+      if (connectionError) {
+        reject(connectionError);
+      } else {
+        connection.query(`SELECT
+sentenceId, sentence, sentenceChinese, wordId
+FROM english_dictionary.sentences`, (error, result) => {
+          if (error) {
+            console.log('SQL error: ', error);
+            reject(error);
+          } else {
+            resolve(result);
+          }
+          connection.release();
+        });
+      }
+    });
+  });
+};
+
 const selectitems = () => {
   return new Promise((resolve, reject) => {
     connectionPool.getConnection((connectionError, connection) => {
       if (connectionError) {
         reject(connectionError);
       } else {
-        connection.query(`SELECT w.*,
-d.derivationId, d.derivation, d.partOfSpeech, d.derivationChinese,
-s.synonymId, s.synonym, s.partOfSpeech, s.synonymChinese,
-a.antonymId, a.antonym, a.partOfSpeech, a.antonymChinese,
-se.sentenceId, se.sentence, se.sentenceChinese
-FROM english_dictionary.words w
-LEFT JOIN english_dictionary.derivations d ON w.wordId = d.wordId
-LEFT JOIN english_dictionary.synonyms s ON w.wordId = s.wordId
-LEFT JOIN english_dictionary.antonyms a ON w.wordId = a.wordId
-LEFT JOIN english_dictionary.sentences se ON w.wordId = se.wordId;`, (error, result) => {
+        connection.query(`SELECT w.*
+FROM english_dictionary.words w`, (error, result) => {
           if (error) {
             console.log('SQL error: ', error);
             reject(error);
           } else {
-            resolve(result);
+            let objs = result;
+            selectDerivations()
+              .then((derivations) => {
+                objs.forEach((obj) => {
+                  if (!obj.derivations) {
+                    obj.derivations = [];
+                  }
+
+                  const findConcat = () => {
+                    if (derivations.findIndex((item) => {
+                      return item.wordId === obj.wordId;
+                    }) !== -1) {
+                      obj.derivations = obj.derivations.concat(derivations.splice(derivations.findIndex((item) => {
+                        return item.wordId === obj.wordId;
+                      }), derivations.findIndex((item) => {
+                        return item.wordId === obj.wordId;
+                      }) + 1));
+
+                      findConcat();
+                    }
+                  };
+
+                  findConcat();
+                });
+                selectSynonyms()
+                  .then((synonyms) => {
+
+                    selectAntonyms()
+                      .then((antonyms) => {
+
+                        selectSentences()
+                          .then((sentences) => {
+                            resolve(objs);
+
+                          });
+
+                      });
+
+                  });
+
+              });
+
           }
           connection.release();
         });
