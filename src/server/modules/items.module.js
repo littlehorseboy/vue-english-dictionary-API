@@ -224,12 +224,71 @@ const createitems = (insertValues) => {
       if (connectionError) {
         reject(connectionError);
       } else {
-        
-        connection.query('INSERT INTO english_dictionary.words SET ?', insertValues, (error, result) => {
+        const derivations = [];
+        const synonyms = [];
+        const antonyms = [];
+        const sentences = [];
+
+        insertValues.forEach((insertValue) => {
+          insertValue.derivations.forEach((derivation) => {
+            derivation.wordId = insertValue.wordId;
+            derivations.push(derivation);
+          });
+          insertValue.synonyms.forEach((synonym) => {
+            synonym.wordId = insertValue.wordId;
+            synonyms.push(synonym);
+          });
+          insertValue.antonyms.forEach((antonym) => {
+            antonym.wordId = insertValue.wordId;
+            antonyms.push(antonym);
+          });
+          insertValue.sentences.forEach((sentence) => {
+            sentence.wordId = insertValue.wordId;
+            sentences.push(sentence);
+          });
+
+          delete insertValue.derivations;
+          delete insertValue.synonyms;
+          delete insertValue.antonyms;
+          delete insertValue.sentences;
+        });
+
+        let sqlString = '';
+
+        insertValues.forEach((insertValue) => {
+          let sql = 'INSERT INTO english_dictionary.words SET ?;';
+          sql = mysql.format(sql, insertValue);
+          sqlString += sql;
+        });
+        derivations.forEach((insertValue) => {
+          let sql = 'INSERT INTO english_dictionary.derivations SET ?;';
+          sql = mysql.format(sql, insertValue);
+          sqlString += sql;
+        });
+        synonyms.forEach((insertValue) => {
+          let sql = 'INSERT INTO english_dictionary.synonyms SET ?;';
+          sql = mysql.format(sql, insertValue);
+          sqlString += sql;
+        });
+        antonyms.forEach((insertValue) => {
+          let sql = 'INSERT INTO english_dictionary.antonyms SET ?;';
+          sql = mysql.format(sql, insertValue);
+          sqlString += sql;
+        });
+        sentences.forEach((insertValue) => {
+          let sql = 'INSERT INTO english_dictionary.sentences SET ?;';
+          sql = mysql.format(sql, insertValue);
+          sqlString += sql;
+        });
+
+        console.log(sqlString);
+
+        connection.query(sqlString, (error, result) => {
           if (error) {
             console.log('SQL error: ', error);
             reject(error);
           } else if (result.affectedRows === 1) {
+            console.log(result);
             resolve({
               message: `新增成功! items_id: ${result.insertId}`,
               id: result.insertId
