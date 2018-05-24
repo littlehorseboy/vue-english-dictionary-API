@@ -364,11 +364,11 @@ const createitems = (insertValues) => {
                   queryFunc(queryStrings[start]);
                 } else {
                   console.log('會執行到這邊嗎?');
-                  connection.release();
                   resolve({
                     message: '新增成功!',
                     id: 3345678
                   });
+                  connection.release();
                 }
               };
 
@@ -384,17 +384,17 @@ const createitems = (insertValues) => {
                 //   id: result.insertId
                 // });
               }
-
-              connection.release();
             });
           };
 
           queryFunc(queryStrings[start]);
         };
 
-        querysFunc(aaa.filter((item) => {
+        const aaaNew = aaa.filter((item) => {
           return item !== '';
-        }));
+        });
+        console.log(aaaNew);
+        querysFunc(aaaNew);
       }
     });
   });
