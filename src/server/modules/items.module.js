@@ -253,41 +253,57 @@ const createitems = (insertValues) => {
           delete insertValue.sentences;
         });
 
-        let sqlString = '';
+        let insertWordsSqlString = '';
+        let insertDerivationsSqlString = '';
+        let insertSynonymsSqlString = '';
+        let insertAntonymsSqlString = '';
 
-        insertValues.forEach((insertValue) => {
-          let sql = 'INSERT INTO english_dictionary.words SET ?;';
-          sql = mysql.format(sql, insertValue);
-          sqlString += sql;
-        });
-        derivations.forEach((insertValue) => {
-          let sql = 'INSERT INTO english_dictionary.derivations SET ?;';
-          sql = mysql.format(sql, insertValue);
-          sqlString += sql;
-        });
-        synonyms.forEach((insertValue) => {
-          let sql = 'INSERT INTO english_dictionary.synonyms SET ?;';
-          sql = mysql.format(sql, insertValue);
-          sqlString += sql;
-        });
-        antonyms.forEach((insertValue) => {
-          let sql = 'INSERT INTO english_dictionary.antonyms SET ?;';
-          sql = mysql.format(sql, insertValue);
-          sqlString += sql;
-        });
-        sentences.forEach((insertValue) => {
-          let sql = 'INSERT INTO english_dictionary.sentences SET ?;';
-          sql = mysql.format(sql, insertValue);
-          sqlString += sql;
-        });
+        let sql = '';
+        const wordsArray = [];
+        for (let i = 0; i < insertValues.length; i += 1) {
+          if (i === 0) {
+            sql = `INSERT INTO english_dictionary.words (${Object.keys(insertValues[i]).join(',')}) VALUES ?`;
+          }
+          wordsArray.push(Object.values(insertValues[i]));
+        }
 
-        console.log(sqlString);
+        sql = mysql.format(sql, [wordsArray]);
 
-        connection.query(sqlString, (error, result) => {
+        insertWordsSqlString = sql;
+
+        // insertValues.forEach((insertValue) => {
+        //   let sql = 'INSERT INTO english_dictionary.words SET ?;';
+        //   sql = mysql.format(sql, insertValue);
+        //   sqlString += sql;
+        // });
+        // derivations.forEach((insertValue) => {
+        //   let sql = 'INSERT INTO english_dictionary.derivations SET ?;';
+        //   sql = mysql.format(sql, insertValue);
+        //   sqlString += sql;
+        // });
+        // synonyms.forEach((insertValue) => {
+        //   let sql = 'INSERT INTO english_dictionary.synonyms SET ?;';
+        //   sql = mysql.format(sql, insertValue);
+        //   sqlString += sql;
+        // });
+        // antonyms.forEach((insertValue) => {
+        //   let sql = 'INSERT INTO english_dictionary.antonyms SET ?;';
+        //   sql = mysql.format(sql, insertValue);
+        //   sqlString += sql;
+        // });
+        // sentences.forEach((insertValue) => {
+        //   let sql = 'INSERT INTO english_dictionary.sentences SET ?;';
+        //   sql = mysql.format(sql, insertValue);
+        //   sqlString += sql;
+        // });
+
+        console.log(insertWordsSqlString);
+
+        connection.query(insertWordsSqlString, (error, result) => {
           if (error) {
             console.log('SQL error: ', error);
             reject(error);
-          } else if (result.affectedRows === 1) {
+          } else {
             console.log(result);
             resolve({
               message: `新增成功! items_id: ${result.insertId}`,
