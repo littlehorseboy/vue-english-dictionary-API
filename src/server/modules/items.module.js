@@ -257,6 +257,7 @@ const createitems = (insertValues) => {
         let insertDerivationsSqlString = '';
         let insertSynonymsSqlString = '';
         let insertAntonymsSqlString = '';
+        let insertSentencesSqlString = '';
 
         let sql = '';
         const wordsArray = [];
@@ -266,10 +267,52 @@ const createitems = (insertValues) => {
           }
           wordsArray.push(Object.values(insertValues[i]));
         }
-
         sql = mysql.format(sql, [wordsArray]);
-
         insertWordsSqlString = sql;
+
+        let sql2 = '';
+        const derivationsArray = [];
+        for (let i = 0; i < derivations.length; i += 1) {
+          if (i === 0) {
+            sql2 = `INSERT INTO english_dictionary.derivations (${Object.keys(derivations[i]).join(',')}) VALUES ?`;
+          }
+          derivationsArray.push(Object.values(derivations[i]));
+        }
+        sql2 = mysql.format(sql2, [derivationsArray]);
+        insertDerivationsSqlString = sql2;
+
+        let sql3 = '';
+        const synonymsArray = [];
+        for (let i = 0; i < synonyms.length; i += 1) {
+          if (i === 0) {
+            sql3 = `INSERT INTO english_dictionary.synonyms (${Object.keys(synonyms[i]).join(',')}) VALUES ?`;
+          }
+          synonymsArray.push(Object.values(synonyms[i]));
+        }
+        sql3 = mysql.format(sql3, [synonymsArray]);
+        insertSynonymsSqlString = sql3;
+
+        let sql4 = '';
+        const antonymsArray = [];
+        for (let i = 0; i < antonyms.length; i += 1) {
+          if (i === 0) {
+            sql4 = `INSERT INTO english_dictionary.antonyms (${Object.keys(antonyms[i]).join(',')}) VALUES ?`;
+          }
+          antonymsArray.push(Object.values(antonyms[i]));
+        }
+        sql4 = mysql.format(sql4, [antonymsArray]);
+        insertAntonymsSqlString = sql4;
+
+        let sql5 = '';
+        const sentencesArray = [];
+        for (let i = 0; i < sentences.length; i += 1) {
+          if (i === 0) {
+            sql5 = `INSERT INTO english_dictionary.sentences (${Object.keys(sentences[i]).join(',')}) VALUES ?`;
+          }
+          sentencesArray.push(Object.values(sentences[i]));
+        }
+        sql5 = mysql.format(sql5, [sentencesArray]);
+        insertSentencesSqlString = sql5;
 
         // insertValues.forEach((insertValue) => {
         //   let sql = 'INSERT INTO english_dictionary.words SET ?;';
@@ -298,20 +341,60 @@ const createitems = (insertValues) => {
         // });
 
         console.log(insertWordsSqlString);
+        console.log(insertDerivationsSqlString);
+        console.log(insertSynonymsSqlString);
+        console.log(insertAntonymsSqlString);
+        console.log(insertSentencesSqlString);
 
-        connection.query(insertWordsSqlString, (error, result) => {
-          if (error) {
-            console.log('SQL error: ', error);
-            reject(error);
-          } else {
-            console.log(result);
-            resolve({
-              message: `新增成功! items_id: ${result.insertId}`,
-              id: result.insertId
+        const aaa = [];
+        aaa.push(insertWordsSqlString);
+        aaa.push(insertDerivationsSqlString);
+        aaa.push(insertSynonymsSqlString);
+        aaa.push(insertAntonymsSqlString);
+        aaa.push(insertSentencesSqlString);
+
+        const querysFunc = (queryStrings) => {
+          const end = queryStrings.length;
+          let start = 0;
+          const queryFunc = (queryString) => {
+            connection.query(queryString, (error, result) => {
+              const checkQuery = (y, n) => {
+                start += 1;
+                if (start < end) {
+                  queryFunc(queryStrings[start]);
+                } else {
+                  console.log('會執行到這邊嗎?');
+                  connection.release();
+                  resolve({
+                    message: '新增成功!',
+                    id: 3345678
+                  });
+                }
+              };
+
+              if (error) {
+                console.log('SQL error: ', error);
+                checkQuery(0, 1);
+                // reject(error);
+              } else {
+                console.log(result);
+                checkQuery(1, 0);
+                // resolve({
+                //   message: `新增成功! items_id: ${result.insertId}`,
+                //   id: result.insertId
+                // });
+              }
+
+              connection.release();
             });
-          }
-          connection.release();
-        });
+          };
+
+          queryFunc(queryStrings[start]);
+        };
+
+        querysFunc(aaa.filter((item) => {
+          return item !== '';
+        }));
       }
     });
   });
