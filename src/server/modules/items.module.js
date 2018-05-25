@@ -224,6 +224,8 @@ const createitems = (insertValues) => {
       if (connectionError) {
         reject(connectionError);
       } else {
+        // 會一次對五張表新增 先組字串來判斷哪幾張表需要新增
+        // 先將物件內的陣列拆分
         const derivations = [];
         const synonyms = [];
         const antonyms = [];
@@ -253,11 +255,9 @@ const createitems = (insertValues) => {
           delete insertValue.sentences;
         });
 
-        let insertWordsSqlString = '';
-        let insertDerivationsSqlString = '';
-        let insertSynonymsSqlString = '';
-        let insertAntonymsSqlString = '';
-        let insertSentencesSqlString = '';
+        // 下面對五個變數組出 SQL 字串 push 進
+        // 最後會去除空白字串的陣列元素
+        const insertWordsSqlStrings = [];
 
         let sql = '';
         const wordsArray = [];
@@ -268,7 +268,7 @@ const createitems = (insertValues) => {
           wordsArray.push(Object.values(insertValues[i]));
         }
         sql = mysql.format(sql, [wordsArray]);
-        insertWordsSqlString = sql;
+        insertWordsSqlStrings.push(sql);
 
         let sql2 = '';
         const derivationsArray = [];
@@ -279,7 +279,7 @@ const createitems = (insertValues) => {
           derivationsArray.push(Object.values(derivations[i]));
         }
         sql2 = mysql.format(sql2, [derivationsArray]);
-        insertDerivationsSqlString = sql2;
+        insertWordsSqlStrings.push(sql2);
 
         let sql3 = '';
         const synonymsArray = [];
@@ -290,7 +290,7 @@ const createitems = (insertValues) => {
           synonymsArray.push(Object.values(synonyms[i]));
         }
         sql3 = mysql.format(sql3, [synonymsArray]);
-        insertSynonymsSqlString = sql3;
+        insertWordsSqlStrings.push(sql3);
 
         let sql4 = '';
         const antonymsArray = [];
@@ -301,7 +301,7 @@ const createitems = (insertValues) => {
           antonymsArray.push(Object.values(antonyms[i]));
         }
         sql4 = mysql.format(sql4, [antonymsArray]);
-        insertAntonymsSqlString = sql4;
+        insertWordsSqlStrings.push(sql4);
 
         let sql5 = '';
         const sentencesArray = [];
@@ -312,62 +312,50 @@ const createitems = (insertValues) => {
           sentencesArray.push(Object.values(sentences[i]));
         }
         sql5 = mysql.format(sql5, [sentencesArray]);
-        insertSentencesSqlString = sql5;
+        insertWordsSqlStrings.push(sql5);
 
-        // insertValues.forEach((insertValue) => {
-        //   let sql = 'INSERT INTO english_dictionary.words SET ?;';
-        //   sql = mysql.format(sql, insertValue);
-        //   sqlString += sql;
-        // });
-        // derivations.forEach((insertValue) => {
-        //   let sql = 'INSERT INTO english_dictionary.derivations SET ?;';
-        //   sql = mysql.format(sql, insertValue);
-        //   sqlString += sql;
-        // });
-        // synonyms.forEach((insertValue) => {
-        //   let sql = 'INSERT INTO english_dictionary.synonyms SET ?;';
-        //   sql = mysql.format(sql, insertValue);
-        //   sqlString += sql;
-        // });
-        // antonyms.forEach((insertValue) => {
-        //   let sql = 'INSERT INTO english_dictionary.antonyms SET ?;';
-        //   sql = mysql.format(sql, insertValue);
-        //   sqlString += sql;
-        // });
-        // sentences.forEach((insertValue) => {
-        //   let sql = 'INSERT INTO english_dictionary.sentences SET ?;';
-        //   sql = mysql.format(sql, insertValue);
-        //   sqlString += sql;
-        // });
-
-        console.log(insertWordsSqlString);
-        console.log(insertDerivationsSqlString);
-        console.log(insertSynonymsSqlString);
-        console.log(insertAntonymsSqlString);
-        console.log(insertSentencesSqlString);
-
-        const aaa = [];
-        aaa.push(insertWordsSqlString);
-        aaa.push(insertDerivationsSqlString);
-        aaa.push(insertSynonymsSqlString);
-        aaa.push(insertAntonymsSqlString);
-        aaa.push(insertSentencesSqlString);
-
+        /**
+         * 得到 SQL 字串陣列 非同步遞迴依序執行 應該有非同步吧0.0
+         * @param {Array} queryStrings SQL 字串陣列
+         */
         const querysFunc = (queryStrings) => {
-          const end = queryStrings.length;
-          let start = 0;
+          const end = queryStrings.length; // 陣列長度
+          let start = 0; // 遞迴用起始值
+          const count = {
+            successCount: 0, // 執行 SQL 成功次數
+            failCount: 0 // 執行 SQL 失敗次數
+          };
+
+          /**
+           * 執行 SQL
+           * @param {String} queryString 一句 SQL
+           */
           const queryFunc = (queryString) => {
             connection.query(queryString, (error, result) => {
-              const checkQuery = (y, n) => {
+              /**
+               * 計算成功失敗 遞迴最後 resolve
+               * @param {Number} successN
+               * @param {Number} failN
+               */
+              const checkQuery = (successN, failN) => {
                 start += 1;
+
+                count.successCount += successN;
+                count.failCount += failN;
+
                 if (start < end) {
                   queryFunc(queryStrings[start]);
                 } else {
-                  console.log('會執行到這邊嗎?');
-                  resolve({
-                    message: '新增成功!',
-                    id: 3345678
-                  });
+                  if (count.successCount === end) {
+                    resolve({
+                      message: '新增成功!'
+                    });
+                  } else if (count.failCount === end) {
+                    reject(count); // horseTODO
+                  } else {
+                    reject(count); // horseTODO
+                  }
+
                   connection.release();
                 }
               };
@@ -375,14 +363,9 @@ const createitems = (insertValues) => {
               if (error) {
                 console.log('SQL error: ', error);
                 checkQuery(0, 1);
-                // reject(error);
               } else {
                 console.log(result);
                 checkQuery(1, 0);
-                // resolve({
-                //   message: `新增成功! items_id: ${result.insertId}`,
-                //   id: result.insertId
-                // });
               }
             });
           };
@@ -390,24 +373,27 @@ const createitems = (insertValues) => {
           queryFunc(queryStrings[start]);
         };
 
-        const aaaNew = aaa.filter((item) => {
+        // 排除是空白字串的陣列元素
+        const insertWordsSqlStringsNoEmpty = insertWordsSqlStrings.filter((item) => {
           return item !== '';
         });
-        console.log(aaaNew);
-        querysFunc(aaaNew);
+
+        console.log(insertWordsSqlStringsNoEmpty);
+
+        querysFunc(insertWordsSqlStringsNoEmpty);
       }
     });
   });
 };
 
 /** items PUT 修改 */
-const modifyitems = (insertValues, userId) => {
+const modifyitems = (updateValues, userId) => {
   return new Promise((resolve, reject) => {
     connectionPool.getConnection((connectionError, connection) => {
       if (connectionError) {
         reject(connectionError);
       } else {
-        connection.query('UPDATE timelineitems SET ? WHERE id= ? ', [insertValues, userId], (error, result) => {
+        connection.query('UPDATE timelineitems SET ? WHERE id= ? ', [updateValues, userId], (error, result) => {
           if (error) {
             console.log('SQL error: ', error);
             reject(error);
