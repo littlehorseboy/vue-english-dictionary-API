@@ -8,11 +8,13 @@ const router = express.Router();
 
 router.route('/')
   .get(itemsCtrl.itemsGet) /** 取得 items 所有值組 */
-  .post(itemsCtrl.itemsPost); /** 新增 items 值組 */
-
-router.route('/:items_id')
+  .post(itemsCtrl.itemsPost) /** 新增 items 值組 */
   .put(itemsCtrl.itemsPut) /** 修改 Article 值組 */
   .delete(itemsCtrl.itemsDelete); /** 刪除 Article 值組 */
+
+// router.route('/:items_id')
+//   .put(itemsCtrl.itemsPut) /** 修改 Article 值組 */
+//   .delete(itemsCtrl.itemsDelete); /** 刪除 Article 值組 */
 
 // /** 利用 Middleware 取得 Header 中的 Bearer Token */
 // const ensureToken = (req, res, next) => {

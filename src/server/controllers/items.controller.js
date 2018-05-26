@@ -36,8 +36,9 @@ const itemsPut = (req, res) => {
 /** items DELETE 新增 */
 const itemsDelete = (req, res) => {
   // 取得刪除id
-  const userId = req.params.items_id;
-  itemsModule.deleteitems(userId).then((result) => {
+  const insertValues = req.body;
+  console.log(req.body);
+  itemsModule.deleteitems(insertValues).then((result) => {
     res.send(result);
   }).catch((err) => {
     return res.send(err);

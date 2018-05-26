@@ -106,8 +106,8 @@ const selectitems = () => {
       if (connectionError) {
         reject(connectionError);
       } else {
-        connection.query(`SELECT w.*
-FROM english_dictionary.words w`, (error, result) => {
+        connection.query(`SELECT wordId, word, kkPhoneticSymbols, partOfSpeech, chinese
+FROM english_dictionary.words`, (error, result) => {
           if (error) {
             console.log('SQL error: ', error);
             reject(error);
@@ -387,24 +387,182 @@ const createitems = (insertValues) => {
 };
 
 /** items PUT 修改 */
-const modifyitems = (updateValues, userId) => {
+const modifyitems = (updateValues) => {
   return new Promise((resolve, reject) => {
     connectionPool.getConnection((connectionError, connection) => {
       if (connectionError) {
         reject(connectionError);
       } else {
-        connection.query('UPDATE timelineitems SET ? WHERE id= ? ', [updateValues, userId], (error, result) => {
+        const Ids = [];
+        updateValues.forEach((updateValue) => {
+          Ids.push(updateValue.wordId);
+        });
+
+        connection.query('DELETE FROM words WHERE wordId in (?)', [Ids], (error, result) => {
           if (error) {
             console.log('SQL error: ', error);
             reject(error);
-          } else if (result.affectedRows === 0) {
-            resolve('請確認修改Id!');
-          } else if (result.message.match('Changed: 1')) {
-            resolve('資料修改成功!');
+          } else if (result.affectedRows > 0) {
+            // 會一次對五張表新增 先組字串來判斷哪幾張表需要新增
+            // 先將物件內的陣列拆分
+            const derivations = [];
+            const synonyms = [];
+            const antonyms = [];
+            const sentences = [];
+
+            updateValues.forEach((updateValue) => {
+              updateValue.derivations.forEach((derivation) => {
+                derivation.wordId = updateValue.wordId;
+                derivations.push(derivation);
+              });
+              updateValue.synonyms.forEach((synonym) => {
+                synonym.wordId = updateValue.wordId;
+                synonyms.push(synonym);
+              });
+              updateValue.antonyms.forEach((antonym) => {
+                antonym.wordId = updateValue.wordId;
+                antonyms.push(antonym);
+              });
+              updateValue.sentences.forEach((sentence) => {
+                sentence.wordId = updateValue.wordId;
+                sentences.push(sentence);
+              });
+
+              delete updateValue.derivations;
+              delete updateValue.synonyms;
+              delete updateValue.antonyms;
+              delete updateValue.sentences;
+            });
+
+            // 下面對五個變數組出 SQL 字串 push 進
+            // 最後會去除空白字串的陣列元素
+            const updateWordsSqlStrings = [];
+
+            let sql = '';
+            const wordsArray = [];
+            for (let i = 0; i < updateValues.length; i += 1) {
+              if (i === 0) {
+                sql = `INSERT INTO english_dictionary.words (${Object.keys(updateValues[i]).join(',')}) VALUES ?`;
+              }
+              wordsArray.push(Object.values(updateValues[i]));
+            }
+            sql = mysql.format(sql, [wordsArray]);
+            updateWordsSqlStrings.push(sql);
+
+            let sql2 = '';
+            const derivationsArray = [];
+            for (let i = 0; i < derivations.length; i += 1) {
+              if (i === 0) {
+                sql2 = `INSERT INTO english_dictionary.derivations (${Object.keys(derivations[i]).join(',')}) VALUES ?`;
+              }
+              derivationsArray.push(Object.values(derivations[i]));
+            }
+            sql2 = mysql.format(sql2, [derivationsArray]);
+            updateWordsSqlStrings.push(sql2);
+
+            let sql3 = '';
+            const synonymsArray = [];
+            for (let i = 0; i < synonyms.length; i += 1) {
+              if (i === 0) {
+                sql3 = `INSERT INTO english_dictionary.synonyms (${Object.keys(synonyms[i]).join(',')}) VALUES ?`;
+              }
+              synonymsArray.push(Object.values(synonyms[i]));
+            }
+            sql3 = mysql.format(sql3, [synonymsArray]);
+            updateWordsSqlStrings.push(sql3);
+
+            let sql4 = '';
+            const antonymsArray = [];
+            for (let i = 0; i < antonyms.length; i += 1) {
+              if (i === 0) {
+                sql4 = `INSERT INTO english_dictionary.antonyms (${Object.keys(antonyms[i]).join(',')}) VALUES ?`;
+              }
+              antonymsArray.push(Object.values(antonyms[i]));
+            }
+            sql4 = mysql.format(sql4, [antonymsArray]);
+            updateWordsSqlStrings.push(sql4);
+
+            let sql5 = '';
+            const sentencesArray = [];
+            for (let i = 0; i < sentences.length; i += 1) {
+              if (i === 0) {
+                sql5 = `INSERT INTO english_dictionary.sentences (${Object.keys(sentences[i]).join(',')}) VALUES ?`;
+              }
+              sentencesArray.push(Object.values(sentences[i]));
+            }
+            sql5 = mysql.format(sql5, [sentencesArray]);
+            updateWordsSqlStrings.push(sql5);
+
+            /**
+             * 得到 SQL 字串陣列 非同步遞迴依序執行 應該有非同步吧0.0
+             * @param {Array} queryStrings SQL 字串陣列
+             */
+            const querysFunc = (queryStrings) => {
+              const end = queryStrings.length; // 陣列長度
+              let start = 0; // 遞迴用起始值
+              const count = {
+                successCount: 0, // 執行 SQL 成功次數
+                failCount: 0 // 執行 SQL 失敗次數
+              };
+
+              /**
+               * 執行 SQL
+               * @param {String} queryString 一句 SQL
+               */
+              const queryFunc = (queryString) => {
+                connection.query(queryString, (error, result) => {
+                  /**
+                   * 計算成功失敗 遞迴最後 resolve
+                   * @param {Number} successN
+                   * @param {Number} failN
+                   */
+                  const checkQuery = (successN, failN) => {
+                    start += 1;
+
+                    count.successCount += successN;
+                    count.failCount += failN;
+
+                    if (start < end) {
+                      queryFunc(queryStrings[start]);
+                    } else {
+                      if (count.successCount === end) {
+                        resolve({
+                          message: '新增成功!'
+                        });
+                      } else if (count.failCount === end) {
+                        reject(count); // horseTODO
+                      } else {
+                        reject(count); // horseTODO
+                      }
+
+                      connection.release();
+                    }
+                  };
+
+                  if (error) {
+                    console.log('SQL error: ', error);
+                    checkQuery(0, 1);
+                  } else {
+                    console.log(result);
+                    checkQuery(1, 0);
+                  }
+                });
+              };
+
+              queryFunc(queryStrings[start]);
+            };
+
+            // 排除是空白字串的陣列元素
+            const updateWordsSqlStringsNoEmpty = updateWordsSqlStrings.filter((item) => {
+              return item !== '';
+            });
+
+            console.log(updateWordsSqlStringsNoEmpty);
+
+            querysFunc(updateWordsSqlStringsNoEmpty);
           } else {
-            resolve('資料無異動');
+            resolve('這些資料不存在');
           }
-          connection.release();
         });
       }
     });
@@ -412,17 +570,17 @@ const modifyitems = (updateValues, userId) => {
 };
 
 /** items DELETE 新增 */
-const deleteitems = (userId) => {
+const deleteitems = (Ids) => {
   return new Promise((resolve, reject) => {
     connectionPool.getConnection((connectionError, connection) => {
       if (connectionError) {
         reject(connectionError);
       } else {
-        connection.query('DELETE FROM timelineitems WHERE id = ?', userId, (error, result) => {
+        connection.query('DELETE FROM words WHERE wordId in (?)', [Ids], (error, result) => {
           if (error) {
             console.log('SQL error: ', error);
             reject(error);
-          } else if (result.affectedRows === 1) {
+          } else if (result.affectedRows > 0) {
             resolve('刪除成功');
           } else {
             resolve('刪除失敗');
